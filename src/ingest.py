@@ -5,6 +5,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from uuid import uuid4
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+import hashlib
 
 load_dotenv()
 
@@ -41,6 +42,7 @@ embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
 texts = [doc.page_content for doc in docs]
 vectors_list = embeddings.embed_documents(texts)
+#chunk_id = hashlib.sha256(f"{doc.metadata['source']}-{i}".encode()).hexdigest()
 
 # Sanity check the dimension actually matches the index
 if len(vectors_list[0]) != EMBED_DIM:
@@ -51,9 +53,9 @@ if len(vectors_list[0]) != EMBED_DIM:
 
 # --- Build upsert payload ---
 records = []
-for doc, vector in zip(docs, vectors_list):
+for i, (doc, vector) in enumerate(zip(docs, vectors_list)):
     records.append({
-        "id": str(uuid4()),
+        "id": hashlib.sha256(f"{doc.metadata['source']}-{i}".encode()).hexdigest(),
         "values": vector,
         "metadata": {
             "text": doc.page_content,
