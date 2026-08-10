@@ -42,7 +42,7 @@ embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
 texts = [doc.page_content for doc in docs]
 vectors_list = embeddings.embed_documents(texts)
-#chunk_id = hashlib.sha256(f"{doc.metadata['source']}-{i}".encode()).hexdigest()
+
 
 # Sanity check the dimension actually matches the index
 if len(vectors_list[0]) != EMBED_DIM:
@@ -70,3 +70,15 @@ for i in range(0, len(records), batch_size):
     index.upsert(vectors=batch)
 
 print(f"Successfully added {len(docs)} chunks from directory into Pinecone.")
+
+question = "Forced buyout claim"
+
+query_vector = embeddings.embed_query(question)
+
+results = index.query(
+    vector=query_vector,
+    top_k=1,
+    include_metadata=True
+)
+
+print(results)
