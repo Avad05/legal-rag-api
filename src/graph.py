@@ -51,7 +51,7 @@ def retrieve(state: RAGState):
     # Search Pinecone
     results = index.query(
         vector=query_vector,
-        top_k=5,
+        top_k=2,
         include_metadata=True
     )
 
@@ -69,13 +69,24 @@ def retrieve(state: RAGState):
         "chunks": chunks
     }
 
+def check_quality(state):
+    chunks = state["chunks"]
+
+    highest_score = max(
+        chunk["score"] for chunk in chunks
+    )
+
+    if highest_score < 0.65:
+        return {"quality_check": "bad"}
+
+    return {"quality_check": "good"}
 
 # -----------------------------
 # Test Retrieve Node
 # -----------------------------
 
 question = (
-    "Who vacated Unit 4B on 31 March 2025"
+    "A commercial suit above five lakh fictional rupees must go to what for 30 days"
 )
 
 initial_state: RAGState = {
@@ -95,3 +106,42 @@ for chunk in result["chunks"]:
     print("Score:", chunk["score"])
     print("Text:", chunk["text"])
     print("-" * 80)
+
+# -----------------------------
+# Test Quality Check
+# -----------------------------
+
+test_questions = [
+    "Who claims Orbix delivered a defective enterprise resource planning suite?",
+    "A commercial suit above five lakh fictional rupees must go to what for 30 days",
+    "What is the capital of France?"
+]
+
+for question in test_questions:
+
+    state = {
+        "question": question,
+        "chunks": [],
+        "quality_check": "",
+        "answer": "",
+        "citations": []
+    }
+
+    # Retrieve relevant chunks
+    retrieved = retrieve(state)
+
+    # Put retrieved chunks into state
+    state["chunks"] = retrieved["chunks"]
+
+    # Check quality
+    quality = check_quality(state)
+
+    print("\nQuestion:", question)
+
+    highest_score = max(
+        chunk["score"] for chunk in state["chunks"]
+    )
+
+    print("Highest score:", highest_score)
+    print("Quality:", quality["quality_check"])
+    print("-" * 60)
