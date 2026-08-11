@@ -71,14 +71,14 @@ for i in range(0, len(records), batch_size):
 
 print(f"Successfully added {len(docs)} chunks from directory into Pinecone.")
 
-question = "Forced buyout claim"
+#question = "Forced buyout claim"
 
-query_vector = embeddings.embed_query(question)
+#query_vector = embeddings.embed_query(question)
 
-results = index.query(
-    vector=query_vector,
-    top_k=1,
-    include_metadata=True
-)
+#results = index.query(
+#    vector=query_vector,
+#    top_k=1,
+#    include_metadata=True
+#)
 
-print(results)
+#print(results)
