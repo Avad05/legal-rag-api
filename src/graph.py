@@ -185,22 +185,22 @@ def check_quality(state: RAGState):
     # --------------------------------------------------------
 
     prompt = f"""
-You are evaluating retrieved evidence for a legal question.
+    You are evaluating retrieved evidence for a legal question.
 
-Question:
-{state["question"]}
+    Question:
+    {state["question"]}
 
-Retrieved context:
-{context}
+    Retrieved context:
+    {context}
 
-Does the retrieved context contain enough information
-to answer the question accurately?
+    Does the retrieved context contain enough information
+    to answer the question accurately?
 
-Return ONLY one word:
-good
-or
-bad
-"""
+    Return ONLY one word:
+    good
+    or
+    bad
+    """
 
     # --------------------------------------------------------
     # 5. Ask Gemini
@@ -226,6 +226,61 @@ bad
         "quality_check": decision
     }
 
+def generate_answer(state: RAGState):
+
+    question = state["question"]
+    chunks = state["chunks"]
+
+    context = "\n\n".join(
+        f"Source: {chunk['source']}\n{chunk['text']}"
+        for chunk in chunks
+    )
+
+    prompt = f"""
+    You are a legal document question-answering assistant.
+
+    Answer the user's question using ONLY the information
+    contained in the provided context.
+
+    Do not use outside knowledge.
+    Do not invent facts.
+    If the context does not contain the answer, say that
+    the answer cannot be found in the provided documents.
+
+    Question:
+    {question}
+
+    Context:
+    {context}
+
+    Provide a concise and accurate answer.
+    """
+
+    response = llm.invoke(prompt)
+
+    answer = response.text.strip()
+
+    citations = list({
+        chunk["source"]
+        for chunk in chunks
+    })
+
+    return {
+        "answer": answer,
+        "citations": citations
+    }
+
+def no_answer(state: RAGState):
+
+    return {
+        "answer": "I cannot find sufficient information to answer this question in the provided documents.",
+        "citations": []
+    }
+
+def route_quality(state: RAGState):
+
+    return state["quality_check"]
+
 #========================================================
 # Connecting Nodes through Langgraph
 #========================================================
@@ -234,10 +289,21 @@ workflow = StateGraph(RAGState)
 
 workflow.add_node("retriever", retrieve)
 workflow.add_node("qualityChecker", check_quality)
+workflow.add_node("generate_answer", generate_answer)
+workflow.add_node("no_answer", no_answer)
 
 workflow.add_edge(START, "retriever")
 workflow.add_edge("retriever", "qualityChecker")
-workflow.add_edge("qualityChecker", END)
+workflow.add_conditional_edges(
+    "qualityChecker",
+    route_quality,
+    {
+        "good": "generate_answer",
+        "bad": "no_answer"
+    }
+)
+workflow.add_edge("generate_answer", END)
+workflow.add_edge("no_answer", END)
 
 app = workflow.compile()
 
@@ -249,6 +315,14 @@ test_input = {
     "citations": []
 }
 
-final_state = app.invoke(test_input)
+final_state = app.invoke(test_input, config={"recursion_limit": 5})
 
-print(final_state)
+print("\nFINAL ANSWER:")
+print(final_state["answer"])
+
+print("\nQUALITY:")
+print(final_state["quality_check"])
+
+print("\nCITATIONS:")
+for citation in final_state["citations"]:
+    print(citation)
