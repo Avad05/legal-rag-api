@@ -1,5 +1,6 @@
 import os
 from typing import TypedDict, List
+from langgraph.graph import StateGraph, START, END
 
 from dotenv import load_dotenv
 from langchain_google_genai import (
@@ -225,68 +226,29 @@ bad
         "quality_check": decision
     }
 
+#========================================================
+# Connecting Nodes through Langgraph
+#========================================================
 
-# ============================================================
-# Manual Testing
-# ============================================================
+workflow = StateGraph(RAGState)
 
-if __name__ == "__main__":
+workflow.add_node("retriever", retrieve)
+workflow.add_node("qualityChecker", check_quality)
 
-    test_questions = [
-        "Who claims Orbix delivered a defective enterprise resource planning suite?",
+workflow.add_edge(START, "retriever")
+workflow.add_edge("retriever", "qualityChecker")
+workflow.add_edge("qualityChecker", END)
 
-        "A commercial suit above five lakh fictional rupees must go to what for 30 days",
+app = workflow.compile()
 
-        "What is the capital of France?",
-    ]
+test_input = {
+    "question": "Northfield offered to pay 70% of open invoices if who drops the damage counterclaim?",
+    "chunks": [],
+    "quality_check": "",
+    "answer": "",
+    "citations": []
+}
 
-    for question in test_questions:
+final_state = app.invoke(test_input)
 
-        print("\n" + "=" * 80)
-        print("QUESTION:", question)
-        print("=" * 80)
-
-        # ----------------------------------------------------
-        # Create initial state
-        # ----------------------------------------------------
-
-        state: RAGState = {
-            "question": question,
-            "chunks": [],
-            "quality_check": "",
-            "answer": "",
-            "citations": [],
-        }
-
-        # ----------------------------------------------------
-        # Run retrieve node
-        # ----------------------------------------------------
-
-        retrieved = retrieve(state)
-
-        state["chunks"] = retrieved["chunks"]
-
-        # ----------------------------------------------------
-        # Run quality check node
-        # ----------------------------------------------------
-
-        quality = check_quality(state)
-
-        # ----------------------------------------------------
-        # Print final result
-        # ----------------------------------------------------
-
-        if state["chunks"]:
-
-            highest_score = max(
-                chunk["score"]
-                for chunk in state["chunks"]
-            )
-
-        else:
-            highest_score = 0
-
-        print("\nFINAL RESULT")
-        print("Highest score:", highest_score)
-        print("Quality:", quality["quality_check"])
-        print("-" * 80)
+print(final_state)
