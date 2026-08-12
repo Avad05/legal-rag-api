@@ -53,13 +53,20 @@ if len(vectors_list[0]) != EMBED_DIM:
 
 # --- Build upsert payload ---
 records = []
+
 for i, (doc, vector) in enumerate(zip(docs, vectors_list)):
+
+    chunk_id = hashlib.sha256(
+        f"{doc.metadata['source']}-{i}".encode()
+    ).hexdigest()
+
     records.append({
-        "id": hashlib.sha256(f"{doc.metadata['source']}-{i}".encode()).hexdigest(),
+        "id": chunk_id,
         "values": vector,
         "metadata": {
+            "chunk_id": chunk_id,
             "text": doc.page_content,
-            **doc.metadata,
+            "source": doc.metadata["source"],
         },
     })
 

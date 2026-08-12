@@ -101,6 +101,7 @@ def retrieve(state: RAGState):
     for match in results["matches"]:
         chunks.append(
             {
+                "chunk_id": match["metadata"]["chunk_id"],
                 "text": match["metadata"]["text"],
                 "source": match["metadata"]["source"],
                 "score": match["score"],
@@ -232,38 +233,44 @@ def generate_answer(state: RAGState):
     chunks = state["chunks"]
 
     context = "\n\n".join(
-        f"Source: {chunk['source']}\n{chunk['text']}"
+        f"Source: {chunk['source']}\n"
+        f"Chunk ID: {chunk['chunk_id']}\n"
+        f"{chunk['text']}"
         for chunk in chunks
     )
 
     prompt = f"""
-    You are a legal document question-answering assistant.
+You are a legal document question-answering assistant.
 
-    Answer the user's question using ONLY the information
-    contained in the provided context.
+Answer the user's question using ONLY the provided context.
 
-    Do not use outside knowledge.
-    Do not invent facts.
-    If the context does not contain the answer, say that
-    the answer cannot be found in the provided documents.
+Do not use outside knowledge.
+Do not invent facts.
 
-    Question:
-    {question}
+Question:
+{question}
 
-    Context:
-    {context}
+Context:
+{context}
 
-    Provide a concise and accurate answer.
-    """
+Provide a concise and accurate answer.
+"""
 
     response = llm.invoke(prompt)
 
     answer = response.text.strip()
 
-    citations = list({
-        chunk["source"]
-        for chunk in chunks
-    })
+    # Use the highest-scoring chunk as the primary citation
+    best_chunk = max(
+        chunks,
+        key=lambda chunk: chunk["score"]
+    )
+
+    citations = [
+        {
+            "source": best_chunk["source"]
+        }
+    ]
 
     return {
         "answer": answer,
