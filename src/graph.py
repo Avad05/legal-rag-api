@@ -312,7 +312,7 @@ workflow.add_conditional_edges(
 workflow.add_edge("generate_answer", END)
 workflow.add_edge("no_answer", END)
 
-app = workflow.compile()
+graph = workflow.compile()
 
 test_input = {
     "question": "Northfield offered to pay 70% of open invoices if who drops the damage counterclaim?",
@@ -322,7 +322,7 @@ test_input = {
     "citations": []
 }
 
-final_state = app.invoke(test_input, config={"recursion_limit": 5})
+final_state = graph.invoke(test_input, config={"recursion_limit": 5})
 
 print("\nFINAL ANSWER:")
 print(final_state["answer"])

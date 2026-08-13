@@ -2,10 +2,10 @@ import os
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from uuid import uuid4
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import hashlib
+
 
 load_dotenv()
 
@@ -15,77 +15,118 @@ gemini_api_key = os.getenv("GEMINI_API_KEY")
 pc = Pinecone(api_key=pinecone_api_key)
 
 index_name = "langchain-test-index"
-if pc.has_index(index_name):
-    pc.delete_index(index_name)
-
 EMBED_DIM = 3072
 
-if not pc.has_index(index_name):
-    pc.create_index(
-        name=index_name,
-        dimension=EMBED_DIM,
-        metric="cosine",
-        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+
+def ingest_documents():
+
+    # -----------------------------
+    # Create Pinecone index
+    # -----------------------------
+
+    
+    if not pc.has_index(index_name):
+        pc.create_index(
+            name=index_name,
+            dimension=EMBED_DIM,
+            metric="cosine",
+            spec=ServerlessSpec(
+                cloud="aws",
+                region="us-east-1"
+            ),
+        )
+
+    index = pc.Index(index_name)
+
+    # -----------------------------
+    # Load & split documents
+    # -----------------------------
+
+    loader = DirectoryLoader(
+        "corpus",
+        glob="./*.md",
+        loader_cls=TextLoader
     )
 
-index = pc.Index(index_name)
+    documents = loader.load()
 
-# --- Load & split docs ---
-loader = DirectoryLoader("../corpus", glob="./*.md", loader_cls=TextLoader)
-documents = loader.load()
-
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-docs = text_splitter.split_documents(documents)
-
-# --- Embed manually ---
-embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
-
-texts = [doc.page_content for doc in docs]
-vectors_list = embeddings.embed_documents(texts)
-
-
-# Sanity check the dimension actually matches the index
-if len(vectors_list[0]) != EMBED_DIM:
-    raise ValueError(
-        f"Embedding dim {len(vectors_list[0])} doesn't match index dim {EMBED_DIM}. "
-        "Recreate the index with the correct dimension."
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=50
     )
 
-# --- Build upsert payload ---
-records = []
+    docs = text_splitter.split_documents(documents)
 
-for i, (doc, vector) in enumerate(zip(docs, vectors_list)):
+    # -----------------------------
+    # Embed documents
+    # -----------------------------
 
-    chunk_id = hashlib.sha256(
-        f"{doc.metadata['source']}-{i}".encode()
-    ).hexdigest()
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview"
+    )
 
-    records.append({
-        "id": chunk_id,
-        "values": vector,
-        "metadata": {
-            "chunk_id": chunk_id,
-            "text": doc.page_content,
-            "source": doc.metadata["source"],
-        },
-    })
+    texts = [doc.page_content for doc in docs]
 
-# --- Upsert in batches (Pinecone recommends <=100 per batch) ---
-batch_size = 100
-for i in range(0, len(records), batch_size):
-    batch = records[i:i + batch_size]
-    index.upsert(vectors=batch)
+    vectors_list = embeddings.embed_documents(texts)
 
-print(f"Successfully added {len(docs)} chunks from directory into Pinecone.")
+    # -----------------------------
+    # Check embedding dimension
+    # -----------------------------
 
-#question = "Forced buyout claim"
+    if len(vectors_list[0]) != EMBED_DIM:
+        raise ValueError(
+            f"Embedding dim {len(vectors_list[0])} doesn't match "
+            f"index dim {EMBED_DIM}. "
+            "Recreate the index with the correct dimension."
+        )
 
-#query_vector = embeddings.embed_query(question)
+    # -----------------------------
+    # Build Pinecone records
+    # -----------------------------
 
-#results = index.query(
-#    vector=query_vector,
-#    top_k=1,
-#    include_metadata=True
-#)
+    records = []
 
-#print(results)
+    for i, (doc, vector) in enumerate(zip(docs, vectors_list)):
+
+        chunk_id = hashlib.sha256(
+            f"{doc.metadata['source']}-{i}".encode()
+        ).hexdigest()
+
+        records.append({
+            "id": chunk_id,
+            "values": vector,
+            "metadata": {
+                "chunk_id": chunk_id,
+                "text": doc.page_content,
+                "source": doc.metadata["source"],
+            },
+        })
+
+    # -----------------------------
+    # Upsert in batches
+    # -----------------------------
+
+    batch_size = 100
+
+    for i in range(0, len(records), batch_size):
+        batch = records[i:i + batch_size]
+        index.upsert(vectors=batch)
+
+    return {
+        "message": (
+            f"Successfully added {len(docs)} chunks "
+            "from directory into Pinecone."
+        ),
+        "chunks": len(docs)
+    }
+
+
+# -----------------------------
+# CLI execution
+# -----------------------------
+
+if __name__ == "__main__":
+
+    result = ingest_documents()
+
+    print(result["message"])
