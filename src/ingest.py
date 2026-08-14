@@ -1,21 +1,12 @@
-import os
-from dotenv import load_dotenv
-from pinecone import Pinecone, ServerlessSpec
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from pinecone import ServerlessSpec
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import hashlib
 
-
-load_dotenv()
-
-pinecone_api_key = os.getenv("PINECONE_API_KEY")
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-
-pc = Pinecone(api_key=pinecone_api_key)
-
-index_name = "langchain-test-index"
-EMBED_DIM = 3072
+from src.config import (
+    pc, embeddings,
+    INDEX_NAME, EMBED_DIM, CHUNK_SIZE, CHUNK_OVERLAP,
+)
 
 
 def ingest_documents():
@@ -25,9 +16,9 @@ def ingest_documents():
     # -----------------------------
 
     
-    if not pc.has_index(index_name):
+    if not pc.has_index(INDEX_NAME):
         pc.create_index(
-            name=index_name,
+            name=INDEX_NAME,
             dimension=EMBED_DIM,
             metric="cosine",
             spec=ServerlessSpec(
@@ -36,7 +27,7 @@ def ingest_documents():
             ),
         )
 
-    index = pc.Index(index_name)
+    index = pc.Index(INDEX_NAME)
 
     # -----------------------------
     # Load & split documents
@@ -51,8 +42,8 @@ def ingest_documents():
     documents = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
     )
 
     docs = text_splitter.split_documents(documents)
@@ -60,10 +51,6 @@ def ingest_documents():
     # -----------------------------
     # Embed documents
     # -----------------------------
-
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="gemini-embedding-2-preview"
-    )
 
     texts = [doc.page_content for doc in docs]
 

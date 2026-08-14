@@ -10,3 +10,6 @@ Files:
 - 04_statute_style_excerpt_fictional.md
 - 05_counsel_notes_settlement.md
 - 06_property_lease_clause.md
+- 07_kestrel_v_orbix_software_licensing.md
+- 08_greenvale_v_sunita_rao_lease_termination.md
+- 09_talomir_founder_dispute.md
