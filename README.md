@@ -1,6 +1,7 @@
 # Legal RAG API
 
 A production-ready, agentic Question-Answering API for legal documents powered by **LangGraph**, **Gemini**, **Pinecone**, and **FastAPI**.
+(Video attached below)
 
 ---
 
@@ -231,7 +232,7 @@ To run evaluation via Postman:
 
 ## 🎥 Demo Video
 
-> **[Watch the demo video here →](YOUR_VIDEO_LINK_HERE)**
+> **[Watch the demo video here →](https://drive.google.com/file/d/1ikhCfheDOhQg1LgGlx4G2DyV36ee84T2/view?usp=sharing)**
 
 The video covers: install, ingest, starting the API, calling `/ask` with curl/Postman, good answers with citations, an out-of-domain question, and a walkthrough of the LangGraph layout.
 
